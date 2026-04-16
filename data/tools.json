@@ -1,0 +1,27 @@
+[
+  {
+    "id": 1,
+    "tool": "FileZilla",
+    "category": "Deployment",
+    "keywords": ["deploy", "upload", "server", "ftp"],
+    
+    "description": "FileZilla is used to upload project files to the server during deployment.",
+
+    "when_to_use": [
+      "When deploying code to server",
+      "When uploading files to production"
+    ],
+
+    "steps": [
+      "Open FileZilla",
+      "Enter server credentials",
+      "Connect to server",
+      "Upload project files"
+    ],
+
+    "tips": [
+      "Always verify server path before uploading",
+      "Do not overwrite config files"
+    ]
+  }
+]

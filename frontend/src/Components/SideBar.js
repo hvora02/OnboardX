@@ -1,7 +1,7 @@
 export default function SideBar({ activeRole, userName, activeTab, setActiveTab }) {
   const menuItems = [
-    { id: "dashboard", label: "Dashboard", icon: "📊" },
     { id: "mentor", label: "AI Mentor", icon: "💬" },
+    { id: "dashboard", label: "Dashboard", icon: "📊" },
     { id: "resources", label: "Resources", icon: "📚" },
     { id: "profile", label: "Profile", icon: "👤" }, // This is the button
   ];

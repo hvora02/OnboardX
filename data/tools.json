@@ -1,27 +1,117 @@
 [
   {
-    "id": 1,
-    "tool": "FileZilla",
-    "category": "Deployment",
-    "keywords": ["deploy", "upload", "server", "ftp"],
-    
-    "description": "FileZilla is used to upload project files to the server during deployment.",
-
-    "when_to_use": [
-      "When deploying code to server",
-      "When uploading files to production"
-    ],
-
-    "steps": [
-      "Open FileZilla",
-      "Enter server credentials",
-      "Connect to server",
-      "Upload project files"
-    ],
-
-    "tips": [
-      "Always verify server path before uploading",
-      "Do not overwrite config files"
+    "tool": "Zoho People",
+    "category": "HR Tool",
+    "entries": [
+      {
+        "topic": "Apply Leave",
+        "intent": "action",
+        "keywords": [
+          "apply leave",
+          "sick leave",
+          "take leave",
+          "leave request"
+        ],
+        "steps": [
+          "Open the Leave Tracker from the left sidebar",
+          "Click on 'Apply Leave'",
+          "Choose the appropriate leave type (Sick, Casual, Earned, etc.)",
+          "Select the dates (full day or half day)",
+          "Add a reason for your leave",
+          "Click on Submit to send your request"
+        ],
+        "rules": [
+          "Your leave request will need approval from your manager",
+          "Make sure you select the correct leave type",
+          "It’s a good idea to check your leave balance before applying"
+        ],
+        "mistakes": [
+          "Choosing the wrong leave type",
+          "Applying without checking available leave balance"
+        ],
+        "fallback": "If you're unsure about which leave to apply for, you can check the P360 Employee Handbook under Files → Organisation → Policy."
+      },
+      {
+        "topic": "Fill Timesheet",
+        "intent": "action",
+        "keywords": [
+          "timesheet",
+          "log time",
+          "fill hours",
+          "submit timesheet"
+        ],
+        "steps": [
+          "Go to Time Tracker and click on 'Log Time'",
+          "Select the correct client, project, and job",
+          "Add a short description of the work you did",
+          "Enter your working hours",
+          "Click on Save and then submit your timesheet"
+        ],
+        "rules": [
+          "Timesheets should be submitted every week",
+          "All fields are required, so make sure nothing is left blank"
+        ],
+        "mistakes": [
+          "Forgetting to fill in required fields",
+          "Selecting the wrong project or job"
+        ],
+        "fallback": "If you're confused about what to fill in, you can refer to the P360 Employee Handbook under Files → Organisation → Policy."
+      },
+      {
+        "topic": "Clock In / Clock Out",
+        "intent": "action",
+        "keywords": [
+          "check in",
+          "check out",
+          "clock in",
+          "clock out",
+          "attendance"
+        ],
+        "steps": [
+          "Open the Zoho People mobile app",
+          "Tap on 'Check-in' when you start your shift",
+          "Tap on 'Check-out' once your shift ends"
+        ],
+        "rules": [
+          "You need to check in and check out every working day",
+          "Make sure you follow your assigned working hours"
+        ],
+        "mistakes": [
+          "Forgetting to check in at the start of the day",
+          "Forgetting to check out after your shift"
+        ],
+        "fallback": "If you face any confusion, you can refer to the P360 Employee Handbook under Files → Organisation → Policy."
+      },
+      {
+        "topic": "Attendance Regularization",
+        "intent": "problem",
+        "keywords": [
+          "forgot check in",
+          "forgot check out",
+          "missed attendance",
+          "attendance issue",
+          "zoho not working",
+          "regularization"
+        ],
+        "when_to_use": [
+          "If you forgot to check in or check out",
+          "If the Zoho app was not working",
+          "If you attended induction or training",
+          "If it was a client holiday",
+          "If you had a flexible schedule issue"
+        ],
+        "steps": [
+          "Go to the Attendance or Regularization section in Zoho People",
+          "Enter the correct timings or relevant details",
+          "Submit the request for correction",
+          "Wait for your manager to review and approve it"
+        ],
+        "rules": [
+          "Regularization requests always require manager approval",
+          "Make sure your request follows company attendance policies"
+        ],
+        "fallback": "If you're not sure whether to raise a request, you can check the P360 Employee Handbook under Files → Organisation → Policy."
+      }
     ]
   }
 ]

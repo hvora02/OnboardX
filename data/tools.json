@@ -10,7 +10,20 @@
           "apply leave",
           "sick leave",
           "take leave",
-          "leave request"
+          "leave request",
+          "how to apply leave",
+          "apply for leave",
+          "request leave",
+          "casual leave",
+          "earned leave",
+          "pl",
+          "cl",
+          "sl",
+          "want to take off",
+          "going on leave",
+          "need a day off",
+          "leave application",
+          "submit leave"
         ],
         "steps": [
           "Open the Leave Tracker from the left sidebar",
@@ -23,13 +36,106 @@
         "rules": [
           "Your leave request will need approval from your manager",
           "Make sure you select the correct leave type",
-          "It’s a good idea to check your leave balance before applying"
+          "Check your leave balance before applying",
+          "Apply at least 1 day in advance for planned leaves"
         ],
         "mistakes": [
           "Choosing the wrong leave type",
-          "Applying without checking available leave balance"
+          "Applying without checking available leave balance",
+          "Not adding a reason"
         ],
-        "fallback": "If you're unsure about which leave to apply for, you can check the P360 Employee Handbook under Files → Organisation → Policy."
+        "faq": [
+          "Q: How long does approval take? A: Usually within 24 hours, depends on your manager.",
+          "Q: Can I cancel a leave after applying? A: Yes, go to Leave Tracker and cancel the pending request.",
+          "Q: What if I don't have enough balance? A: You may apply for Leave Without Pay (LWP) — check with HR."
+        ]
+      },
+      {
+        "topic": "Half Day Leave",
+        "intent": "action",
+        "keywords": [
+          "half day leave",
+          "half day",
+          "apply half day",
+          "half day sick leave",
+          "first half",
+          "second half",
+          "morning off",
+          "afternoon off",
+          "leave for few hours"
+        ],
+        "steps": [
+          "Open Leave Tracker",
+          "Click on 'Apply Leave'",
+          "Select the leave type",
+          "Choose the date",
+          "Select 'Half Day' option (First Half or Second Half)",
+          "Enter reason and submit"
+        ],
+        "rules": [
+          "Half day option must be selected correctly — First Half or Second Half",
+          "Manager approval is required",
+          "Half day counts as 0.5 from your leave balance"
+        ],
+        "faq": [
+          "Q: Does half day deduct full leave? A: No, it deducts only 0.5 from your balance."
+        ]
+      },
+      {
+        "topic": "Leave Rejected",
+        "intent": "problem",
+        "keywords": [
+          "leave rejected",
+          "manager rejected leave",
+          "leave not approved",
+          "leave denied",
+          "my leave got rejected",
+          "leave application rejected",
+          "why was my leave rejected",
+          "leave request declined"
+        ],
+        "steps": [
+          "Go to Leave Tracker and check the rejection reason your manager mentioned",
+          "Make corrections if needed (wrong dates, wrong type, missing reason)",
+          "Reapply with proper details",
+          "If still unclear, talk to your manager directly for clarification"
+        ],
+        "rules": [
+          "Manager decision is final unless discussed",
+          "Always provide a proper reason while applying",
+          "Team availability can also be a reason for rejection during busy periods"
+        ],
+        "faq": [
+          "Q: Can I appeal a rejected leave? A: Yes, speak to your manager or HR directly."
+        ]
+      },
+      {
+        "topic": "Check Leave Balance",
+        "intent": "action",
+        "keywords": [
+          "leave balance",
+          "how many leaves left",
+          "check leaves",
+          "remaining leaves",
+          "how many leaves do i have",
+          "leave quota",
+          "leaves available",
+          "my leave count"
+        ],
+        "steps": [
+          "Open Zoho People",
+          "Go to Leave Tracker from the left sidebar",
+          "Click on 'Leave Balance' or 'My Leaves'",
+          "You will see a breakdown of all leave types and remaining balance"
+        ],
+        "rules": [
+          "Leave balance resets at the start of the financial year",
+          "Earned leaves may carry forward — check with HR for policy"
+        ],
+        "faq": [
+          "Q: When do leaves reset? A: At the start of the financial year.",
+          "Q: Do unused leaves carry forward? A: Earned leaves may, casual leaves typically don't — confirm with HR."
+        ]
       },
       {
         "topic": "Fill Timesheet",
@@ -38,7 +144,14 @@
           "timesheet",
           "log time",
           "fill hours",
-          "submit timesheet"
+          "submit timesheet",
+          "how to fill timesheet",
+          "weekly timesheet",
+          "log work hours",
+          "time entry",
+          "fill my hours",
+          "submit hours",
+          "log hours"
         ],
         "steps": [
           "Go to Time Tracker and click on 'Log Time'",
@@ -48,14 +161,19 @@
           "Click on Save and then submit your timesheet"
         ],
         "rules": [
-          "Timesheets should be submitted every week",
-          "All fields are required, so make sure nothing is left blank"
+          "Timesheets should be submitted every week — usually by Friday EOD",
+          "All fields (client, project, job, description) are required",
+          "Do not leave timesheets pending for more than a week"
         ],
         "mistakes": [
-          "Forgetting to fill in required fields",
-          "Selecting the wrong project or job"
+          "Forgetting to fill required fields",
+          "Selecting wrong project or client",
+          "Saving but not submitting"
         ],
-        "fallback": "If you're confused about what to fill in, you can refer to the P360 Employee Handbook under Files → Organisation → Policy."
+        "faq": [
+          "Q: What if I forget to submit on Friday? A: Submit ASAP and inform your manager.",
+          "Q: Can I edit a submitted timesheet? A: Only before it's approved — contact your manager if already approved."
+        ]
       },
       {
         "topic": "Clock In / Clock Out",
@@ -65,7 +183,13 @@
           "check out",
           "clock in",
           "clock out",
-          "attendance"
+          "attendance",
+          "mark attendance",
+          "how to check in",
+          "punch in",
+          "punch out",
+          "daily attendance",
+          "log attendance"
         ],
         "steps": [
           "Open the Zoho People mobile app",
@@ -73,14 +197,18 @@
           "Tap on 'Check-out' once your shift ends"
         ],
         "rules": [
-          "You need to check in and check out every working day",
-          "Make sure you follow your assigned working hours"
+          "Must be done daily",
+          "Follow your assigned working hours",
+          "Check-in and check-out both are mandatory"
         ],
         "mistakes": [
-          "Forgetting to check in at the start of the day",
-          "Forgetting to check out after your shift"
+          "Forgetting check-in",
+          "Forgetting check-out — this will show as incomplete attendance"
         ],
-        "fallback": "If you face any confusion, you can refer to the P360 Employee Handbook under Files → Organisation → Policy."
+        "faq": [
+          "Q: What if I forget to check out? A: Apply for attendance regularization immediately.",
+          "Q: Can I check in from home? A: Depends on your company's WFH policy — check with HR."
+        ]
       },
       {
         "topic": "Attendance Regularization",
@@ -91,26 +219,337 @@
           "missed attendance",
           "attendance issue",
           "zoho not working",
-          "regularization"
+          "regularization",
+          "missed check in",
+          "missed check out",
+          "fix attendance",
+          "correct attendance",
+          "attendance wrong",
+          "attendance not marked",
+          "did not check in",
+          "did not check out"
         ],
         "when_to_use": [
-          "If you forgot to check in or check out",
-          "If the Zoho app was not working",
-          "If you attended induction or training",
-          "If it was a client holiday",
-          "If you had a flexible schedule issue"
+          "Forgot to check in or out",
+          "Zoho app not working",
+          "Training or induction day",
+          "Client holiday",
+          "Flexi schedule issue"
         ],
         "steps": [
-          "Go to the Attendance or Regularization section in Zoho People",
-          "Enter the correct timings or relevant details",
-          "Submit the request for correction",
-          "Wait for your manager to review and approve it"
+          "Go to Attendance section in Zoho People",
+          "Click on 'Regularization' or 'Attendance Regularization'",
+          "Select the date for which you need to fix attendance",
+          "Enter the correct check-in and check-out timings",
+          "Add a reason (e.g. forgot to check in, app not working)",
+          "Submit the request and wait for manager approval"
         ],
         "rules": [
-          "Regularization requests always require manager approval",
-          "Make sure your request follows company attendance policies"
+          "Manager approval is required",
+          "Must be submitted as soon as possible — don't delay",
+          "Repeated regularization requests may be flagged by HR"
         ],
-        "fallback": "If you're not sure whether to raise a request, you can check the P360 Employee Handbook under Files → Organisation → Policy."
+        "faq": [
+          "Q: How many times can I regularize? A: There's usually a monthly limit — check with HR.",
+          "Q: What if my manager doesn't approve? A: Follow up with your manager or raise it with HR."
+        ]
+      },
+      {
+        "topic": "Payslip Download",
+        "intent": "action",
+        "keywords": [
+          "payslip",
+          "salary slip",
+          "download payslip",
+          "get salary slip",
+          "monthly payslip",
+          "pay stub",
+          "salary document",
+          "proof of salary"
+        ],
+        "steps": [
+          "Open Zoho People",
+          "Go to the 'Payroll' or 'My Pay' section from the sidebar",
+          "Select the month for which you need the payslip",
+          "Click Download or View Payslip"
+        ],
+        "rules": [
+          "Payslips are available after salary is processed (usually after 1st of each month)",
+          "Contact HR if payslip is not visible"
+        ],
+        "faq": [
+          "Q: When is the payslip available? A: Usually after the 1st or 5th of each month after salary processing.",
+          "Q: What if payslip shows wrong amount? A: Contact HR immediately."
+        ]
+      }
+    ]
+  },
+  {
+    "tool": "GitHub Desktop",
+    "category": "Version Control",
+    "entries": [
+      {
+        "topic": "Clone Repository",
+        "intent": "action",
+        "keywords": [
+          "clone repo",
+          "clone repository",
+          "download repo",
+          "github clone",
+          "how to clone repo",
+          "get repository",
+          "copy repo",
+          "get codebase",
+          "download project code",
+          "get project",
+          "set up repo locally",
+          "get the code",
+          "project code",
+          "code on my laptop",
+          "get project on laptop",
+          "download the project"
+        ],
+        "steps": [
+          "Open GitHub Desktop",
+          "Click 'File' → 'Clone Repository'",
+          "Select repo from the list or paste the URL",
+          "Choose a local folder to save it",
+          "Click 'Clone' and wait for it to finish"
+        ],
+        "rules": [
+          "You must have repository access before cloning",
+          "Login with your company GitHub account — not personal",
+          "Ask your manager or team lead for access if you don't have it"
+        ],
+        "mistakes": [
+          "Selecting wrong local folder",
+          "Not having repo access before trying to clone",
+          "Using personal GitHub account instead of company account"
+        ],
+        "faq": [
+          "Q: Where should I clone the repo? A: Usually in a dedicated 'Projects' folder on your system.",
+          "Q: What if clone fails? A: Check your GitHub login and make sure you have access to that repo."
+        ]
+      },
+      {
+        "topic": "No Repository Access",
+        "intent": "problem",
+        "keywords": [
+          "no access repo",
+          "no repo access",
+          "permission denied github",
+          "cannot clone repo",
+          "access denied",
+          "forbidden github",
+          "not authorized",
+          "repo not visible",
+          "can't see repository",
+          "github 403",
+          "github permission error"
+        ],
+        "steps": [
+          "Check if you're logged into the correct company GitHub account",
+          "Verify that you actually have access to that repository",
+          "Request access from your manager or the repository owner",
+          "Once access is granted, try cloning again"
+        ],
+        "rules": [
+          "Access must be granted before cloning",
+          "Always use company GitHub account — not personal"
+        ],
+        "faq": [
+          "Q: Who do I ask for repo access? A: Your manager or the team lead who owns the repository.",
+          "Q: How long does access take? A: Usually within a few hours once requested."
+        ]
+      },
+      {
+        "topic": "Create Branch",
+        "intent": "action",
+        "keywords": [
+          "create branch",
+          "new branch",
+          "feature branch",
+          "make a branch",
+          "how to branch",
+          "start new branch",
+          "branch from main",
+          "branch from master",
+          "create new branch"
+        ],
+        "steps": [
+          "Make sure you're on the correct base branch (usually 'main' or 'develop')",
+          "Pull latest changes first",
+          "Click 'Current Branch' at the top",
+          "Select 'New Branch'",
+          "Enter a branch name following your team's naming convention",
+          "Click 'Create Branch'"
+        ],
+        "rules": [
+          "Always pull latest code before creating a branch",
+          "Follow your team's naming convention (e.g. feature/login-page, fix/header-bug)",
+          "Never work directly on main or master branch"
+        ],
+        "faq": [
+          "Q: What should I name my branch? A: Follow team convention like feature/your-feature-name or fix/bug-name.",
+          "Q: Which base branch to use? A: Ask your team lead — usually 'main' or 'develop'."
+        ]
+      },
+      {
+        "topic": "Pull Latest Changes",
+        "intent": "action",
+        "keywords": [
+          "pull code",
+          "fetch origin",
+          "update repo",
+          "latest code",
+          "sync code",
+          "get latest changes",
+          "update my code",
+          "pull changes",
+          "how to pull",
+          "fetch changes",
+          "sync repo"
+        ],
+        "steps": [
+          "Open GitHub Desktop",
+          "Make sure you're on the right branch",
+          "Click 'Fetch origin' to check for new changes",
+          "Click 'Pull origin' to download them"
+        ],
+        "rules": [
+          "Always pull before starting any new work",
+          "Pull before pushing your own changes to avoid conflicts"
+        ],
+        "faq": [
+          "Q: What's the difference between fetch and pull? A: Fetch checks for changes, pull actually downloads them.",
+          "Q: What if I get a conflict after pulling? A: Resolve conflicts in your code editor, then commit."
+        ]
+      },
+      {
+        "topic": "Commit and Push Changes",
+        "intent": "action",
+        "keywords": [
+          "commit",
+          "push code",
+          "push changes",
+          "commit changes",
+          "save changes github",
+          "upload code",
+          "push to github",
+          "how to commit",
+          "how to push",
+          "submit code"
+        ],
+        "steps": [
+          "Make your code changes",
+          "In GitHub Desktop, you'll see your changed files listed",
+          "Write a short commit message describing what you changed",
+          "Click 'Commit to [branch name]'",
+          "Click 'Push origin' to upload your changes to GitHub"
+        ],
+        "rules": [
+          "Always write a meaningful commit message — not just 'changes' or 'fix'",
+          "Commit small, logical chunks of work — not everything at once",
+          "Never push directly to main — use a branch"
+        ],
+        "faq": [
+          "Q: How often should I commit? A: After each logical chunk of work — don't wait too long.",
+          "Q: What's a good commit message? A: Something like 'Add login validation' or 'Fix header alignment bug'."
+        ]
+      },
+      {
+        "topic": "Merge Branch",
+        "intent": "action",
+        "keywords": [
+          "merge branch",
+          "merge code",
+          "merge my branch",
+          "combine branches",
+          "how to merge",
+          "merge into main"
+        ],
+        "steps": [
+          "Switch to the branch you want to merge INTO (e.g. main)",
+          "Click 'Branch' in the top menu",
+          "Click 'Merge into current branch'",
+          "Select the branch you want to merge",
+          "Resolve any conflicts if they appear",
+          "Commit the merge"
+        ],
+        "rules": [
+          "Always test your code before merging",
+          "Get code review/approval before merging into main",
+          "Resolve all conflicts before completing the merge"
+        ],
+        "faq": [
+          "Q: What if there are merge conflicts? A: Open the conflicting files in your editor, resolve them, then commit.",
+          "Q: Can I merge without review? A: Depends on team policy — usually no for main branch."
+        ]
+      },
+      {
+        "topic": "Create Pull Request",
+        "intent": "action",
+        "keywords": [
+          "pull request",
+          "create pr",
+          "raise pr",
+          "open pr",
+          "submit pr",
+          "code review",
+          "request review",
+          "how to create pr",
+          "merge request",
+          "pr"
+        ],
+        "steps": [
+          "Push your branch to GitHub first",
+          "In GitHub Desktop, click 'Create Pull Request' — it opens GitHub in browser",
+          "Add a clear title describing your changes",
+          "Add a description of what you did and why",
+          "Assign reviewers (usually your team lead)",
+          "Submit the PR"
+        ],
+        "rules": [
+          "Code review is required before merging",
+          "Add a clear description — don't leave it blank",
+          "Tag the right reviewers, not random people"
+        ],
+        "faq": [
+          "Q: Who should I add as reviewer? A: Your team lead or whoever owns the codebase.",
+          "Q: Can I push more commits after creating a PR? A: Yes, they automatically update the PR."
+        ]
+      },
+      {
+        "topic": "Merge Conflict",
+        "intent": "problem",
+        "keywords": [
+          "merge conflict",
+          "conflict in code",
+          "conflict github",
+          "conflicting changes",
+          "cannot merge",
+          "conflict error",
+          "resolve conflict",
+          "git conflict"
+        ],
+        "steps": [
+          "GitHub Desktop will highlight files with conflicts",
+          "Open the conflicting file in your code editor",
+          "Look for conflict markers: <<<<<<, =======, >>>>>>>",
+          "Keep the correct version of the code (yours, theirs, or a combination)",
+          "Delete the conflict markers",
+          "Save the file, then go back to GitHub Desktop",
+          "Commit the resolved conflict"
+        ],
+        "rules": [
+          "Never panic — conflicts are normal and part of team development",
+          "When unsure which code to keep, ask your team lead",
+          "Always test after resolving a conflict"
+        ],
+        "faq": [
+          "Q: How do I avoid conflicts? A: Pull the latest code frequently before working.",
+          "Q: What do the conflict markers mean? A: <<<<<<< is your code, >>>>>>> is incoming code, ======= separates them."
+        ]
       }
     ]
   }

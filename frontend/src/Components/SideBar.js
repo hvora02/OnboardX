@@ -3,6 +3,7 @@ export default function SideBar({ activeRole, userName, activeTab, setActiveTab 
     { id: "mentor", label: "AI Mentor", icon: "💬" },
     { id: "dashboard", label: "Dashboard", icon: "📊" },
     { id: "resources", label: "Resources", icon: "📚" },
+    { id: "analytics", label: "Analytics", icon: "📈" },
     { id: "profile", label: "Profile", icon: "👤" }, // This is the button
   ];
 

@@ -5,6 +5,7 @@ import OnboardingScreen from "./Components/OnboardingScreen";
 import App from "./App";
 import MainPage from "./Components/MainPage";
 import ProtectedRoute from "./ProtectedRoute";
+import AdminAnalytics from "./Components/AdminAnalytics";
 
 export default function AppRouter() {
   return (
@@ -19,6 +20,7 @@ export default function AppRouter() {
             </ProtectedRoute>
           }
         />
+        <Route path="/admin" element={<AdminAnalytics />} />
       </Routes>
     </BrowserRouter>
   );

@@ -5,6 +5,7 @@ import ProfilePage from "./ProfilePage";
 import Dashboard from "./DashboardHome";
 import AiMentorPage from "./AiMentorPage";
 import ComingSoonPage from "./ComingSoonPage";
+import AdminAnalytics from "./AdminAnalytics";
 
 export default function MainPage() {
   const location = useLocation();
@@ -29,6 +30,8 @@ export default function MainPage() {
 
         {/* 1. AI Mentor (Primary Feature) */}
         {activeTab === "mentor" && <AiMentorPage activeRole={activeRole} />}
+
+        {activeTab === "analytics" && <AdminAnalytics />}
 
         {/* 2. Coming Soon Pages (Secondary Features) */}
         {(activeTab === "dashboard" || activeTab === "resources" || activeTab === "profile") && (

@@ -10,16 +10,43 @@ conn = sqlite3.connect("chat.db", check_same_thread=False)
 cursor = conn.cursor()
 
 # Creates table (runs once)
+
+# Sessions table
 cursor.execute("""
 CREATE TABLE IF NOT EXISTS sessions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     session_id TEXT,
+    user_id INTEGER,
     question TEXT,
     answer TEXT,
     tool TEXT,
     created_at TIMESTAMP
 )
 """)
+
+# Users table
+cursor.execute("""
+CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT,
+    role TEXT
+)
+""")
+
+cursor.execute("SELECT COUNT(*) FROM users")
+if cursor.fetchone()[0] == 0:
+    cursor.executemany("""
+    INSERT INTO users (name, role) VALUES (?, ?)
+    """, [
+        ("Admin", "admin"),
+        ("Manager A", "manager"),
+        ("Manager B", "manager"),
+        ("Intern A", "employee"),
+        ("Intern B", "employee"),
+        ("Intern C", "employee"),
+        ("Intern D", "employee"),
+        ("Intern E", "employee")
+    ])
 
 conn.commit()
  
@@ -194,6 +221,8 @@ def is_out_of_scope(q):
  
 @app.post("/ask")
 def ask(data: dict):
+    user_id = data.get("user_id", 4)
+
     q = data.get("question", "").strip()
     session_id = data.get("session_id", "default")
  
@@ -254,9 +283,9 @@ def ask(data: dict):
  
         # 💾 Save to DB
         cursor.execute("""
-        INSERT INTO sessions (session_id, question, answer, tool, created_at)
-        VALUES (?, ?, ?, ?, ?)
-        """, (session_id, q, answer, best_tool, datetime.now()))
+        INSERT INTO sessions (session_id, user_id, question, answer, tool, created_at)
+        VALUES (?, ?, ?, ?, ?, ?)
+        """, (session_id, user_id, q, answer, best_tool, datetime.now()))
 
         conn.commit()
 
@@ -271,6 +300,7 @@ def ask(data: dict):
  
     return {"answer": "I couldn’t find that in company data. Try asking about leave, attendance, or GitHub tasks."}
 
+# admin insights
 # for analytics - fetches logs for top-questions
 @app.get("/analytics/top-questions")
 def top_questions():
@@ -289,6 +319,7 @@ def top_questions():
         for row in rows
     ]
 
+# admin insights
 # for analytics - fetches logs for top-tools
 @app.get("/analytics/top-tools")
 def top_tools():
@@ -306,6 +337,7 @@ def top_tools():
         for row in rows
     ]
 
+# admin insights
 # for analytics - fetches logs for intent-breakdown
 @app.get("/analytics/intent-breakdown")
 def intent_breakdown():
@@ -325,3 +357,42 @@ def intent_breakdown():
         "problem_queries": problem,
         "action_queries": action
     }
+
+# user based analytics
+@app.get("/analytics/user/{user_id}")
+def user_analytics(user_id: int):
+    cursor.execute("""
+        SELECT question, COUNT(*) as count
+        FROM sessions
+        WHERE user_id = ?
+        GROUP BY question
+        ORDER BY count DESC
+        LIMIT 5
+    """, (user_id,))
+
+    rows = cursor.fetchall()
+
+    return [
+        {"question": r[0], "count": r[1]}
+        for r in rows
+    ]
+
+# manager insights
+@app.get("/analytics/manager")
+def manager_view():
+    cursor.execute("""
+        SELECT u.name, s.question, COUNT(*) as count
+        FROM sessions s
+        JOIN users u ON s.user_id = u.id
+        WHERE u.role = 'employee'
+        GROUP BY u.name, s.question
+        ORDER BY count DESC
+        LIMIT 10
+    """)
+
+    rows = cursor.fetchall()
+
+    return [
+        {"employee": r[0], "question": r[1], "count": r[2]}
+        for r in rows
+    ]

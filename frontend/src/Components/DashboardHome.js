@@ -1,5 +1,13 @@
-// Dashboard.js
+import { useNavigate } from "react-router-dom";
+
 export default function Dashboard({ userName, activeRole }) {
+  const navigate = useNavigate();
+  const user = JSON.parse(localStorage.getItem("user"));
+
+  if (!user) {
+    navigate("/"); // redirect to login
+  }
+
   return (
     <div className="p-12 max-w-7xl mx-auto">
       {/* Top Header */}

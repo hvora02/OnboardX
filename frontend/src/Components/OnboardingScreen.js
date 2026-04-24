@@ -6,13 +6,40 @@ export default function OnboardXWelcome() {
   const [userName, setUserName] = useState(""); 
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
+  const [error, setError] = useState("");
 
-  const roles = ["Freshers", "Intermediate", "Experienced"];
+  const roles = ["User", "Manager", "Admin"];
 
   const handleStart = () => {
     if (selectedRole && userName.trim()) {
-      // Pass both name and role to the dashboard
-      navigate("/dashboard", { state: { role: selectedRole, name: userName } });
+
+      const validUsers = {
+        "intern a": "user",
+        "intern b": "user",
+        "intern c": "user",
+        "manager a": "manager",
+        "manager b": "manager",
+        "admin": "admin"
+      };
+
+      const normalizedName = userName.trim().toLowerCase();
+      const normalizedRole = selectedRole.toLowerCase();
+
+      if (validUsers[normalizedName] !== normalizedRole) {
+        setError("This user is not registered with that role");
+        return;
+      }
+
+      const userData = {
+        name: normalizedName,
+        role: normalizedRole
+      };
+
+      localStorage.setItem("user", JSON.stringify(userData));
+
+      const session_id = crypto.randomUUID();
+      localStorage.setItem("session_id", session_id);
+      navigate("/dashboard");
     }
   };
 
@@ -54,11 +81,19 @@ export default function OnboardXWelcome() {
           <p className="text-sm text-gray-500 mb-2">What's your name?</p>
           <input
             type="text"
-            placeholder="e.g. Gourab Debnath"
+            placeholder="e.g. Intern A / Manager A"
             value={userName}
-            onChange={(e) => setUserName(e.target.value)}
-            className="w-full border border-gray-200 px-4 py-3 rounded-xl text-gray-700 bg-gray-50 focus:outline-none focus:border-indigo-400 transition-colors"
+            onChange={(e) => {
+              setUserName(e.target.value);
+              setError("");
+            }}
+            className={`w-full border px-4 py-3 rounded-xl bg-gray-50 focus:outline-none transition-colors
+              ${error ? "border-red-400" : "border-gray-200 focus:border-indigo-400"}
+            `}
           />
+          {error && (
+            <p className="text-red-500 text-sm mt-2">{error}</p>
+          )}
         </div>
 
         {/* Dropdown */}

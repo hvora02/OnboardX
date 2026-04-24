@@ -2,6 +2,16 @@ import { useState, useEffect, useRef } from "react";
 import { MessageSquare, Bot, ArrowRight, Zap, ShieldCheck, Loader2 } from "lucide-react";
 
 export default function AiMentorPage({ activeRole }) {
+  // makes session persist - despite refresh
+  useEffect(() => {
+    const session_id = localStorage.getItem("session_id");
+
+    if (!session_id) {
+      const newSession = crypto.randomUUID();
+      localStorage.setItem("session_id", newSession);
+    }
+  }, []);
+
   const [messages, setMessages] = useState([
     {
       sender: "ai",
@@ -37,9 +47,36 @@ export default function AiMentorPage({ activeRole }) {
 
     try {
       // 3. Talk to the FastAPI backend (Port 8000)
-      const response = await fetch(
-        `http://127.0.0.1:8000/ask?q=${encodeURIComponent(messageToSend)}`
-      );
+
+      function mapUserToId(name) {
+        const map = {
+          "admin": 1,
+          "manager a": 2,
+          "manager b": 3,
+          "intern a": 4,
+          "intern b": 5,
+          "intern c": 6,
+          "intern d": 7,
+          "intern e": 8
+        };
+
+        return map[name.trim().toLowerCase()] || 4;
+      }
+
+      const session_id = localStorage.getItem("session_id");
+      const user = JSON.parse(localStorage.getItem("user"));
+
+      const response = await fetch("http://127.0.0.1:8000/ask", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          question: messageToSend,
+          session_id: session_id,
+          user_id: mapUserToId(user.name) // ✅ NOW USED
+        }),
+      });
 
       const data = await response.json();
 
@@ -78,7 +115,7 @@ export default function AiMentorPage({ activeRole }) {
           <h1 className="text-4xl font-black text-slate-900 tracking-tight">AI Mentor</h1>
           <p className="text-slate-500 mt-2 text-lg flex items-center gap-2">
             <ShieldCheck size={18} className="text-emerald-500" />
-            Active Session: <span className="text-indigo-600 font-semibold">{activeRole} Path</span>
+            Active Session: <span className="text-indigo-600 font-semibold">{activeRole}</span>
           </p>
         </div>
         <div className="flex gap-3">
@@ -145,7 +182,7 @@ export default function AiMentorPage({ activeRole }) {
 
                 {msg.sender === "user" && (
                   <div className="w-10 h-10 rounded-2xl bg-indigo-100 flex items-center justify-center text-indigo-700 font-bold shrink-0 shadow-md border-2 border-white">
-                    GD
+                    You
                   </div>
                 )}
               </div>

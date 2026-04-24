@@ -2,6 +2,26 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import json
 import requests
+import sqlite3
+from datetime import datetime
+
+# Creates DB connection
+conn = sqlite3.connect("chat.db", check_same_thread=False)
+cursor = conn.cursor()
+
+# Creates table (runs once)
+cursor.execute("""
+CREATE TABLE IF NOT EXISTS sessions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id TEXT,
+    question TEXT,
+    answer TEXT,
+    tool TEXT,
+    created_at TIMESTAMP
+)
+""")
+
+conn.commit()
  
 app = FastAPI()
  
@@ -181,7 +201,20 @@ def ask(data: dict):
         return {"answer": "Please ask something! 😊"}
  
     q_lower = q.lower()
-    history = sessions.get(session_id, [])
+    cursor.execute("""
+    SELECT question, answer
+    FROM sessions
+    WHERE session_id = ?
+    ORDER BY created_at DESC
+    LIMIT 6
+    """, (session_id,))
+
+    rows = cursor.fetchall()
+
+    history = [
+        {"q": r[0], "a": r[1]}
+        for r in reversed(rows)
+    ]
  
     if q_lower in ["hi", "hello", "hey"]:
         return {"answer": "Hey! 👋 I'm OnboardX. How can I help you?"}
@@ -219,6 +252,15 @@ def ask(data: dict):
     if best_match and best_score >= 5:
         answer = ai_rewrite(q, best_tool, best_match, history)
  
+        # 💾 Save to DB
+        cursor.execute("""
+        INSERT INTO sessions (session_id, question, answer, tool, created_at)
+        VALUES (?, ?, ?, ?, ?)
+        """, (session_id, q, answer, best_tool, datetime.now()))
+
+        conn.commit()
+
+        # Optional: keep memory cache (fine for speed)
         history.append({"q": q, "a": answer})
         sessions[session_id] = history[-6:]
  
@@ -228,3 +270,58 @@ def ask(data: dict):
         return {"answer": "Do you mean something related to your previous question?"}
  
     return {"answer": "I couldn’t find that in company data. Try asking about leave, attendance, or GitHub tasks."}
+
+# for analytics - fetches logs for top-questions
+@app.get("/analytics/top-questions")
+def top_questions():
+    cursor.execute("""
+        SELECT question, COUNT(*) as count
+        FROM sessions
+        GROUP BY question
+        ORDER BY count DESC
+        LIMIT 5
+    """)
+
+    rows = cursor.fetchall()
+
+    return [
+        {"question": row[0], "count": row[1]}
+        for row in rows
+    ]
+
+# for analytics - fetches logs for top-tools
+@app.get("/analytics/top-tools")
+def top_tools():
+    cursor.execute("""
+        SELECT tool, COUNT(*) as count
+        FROM sessions
+        GROUP BY tool
+        ORDER BY count DESC
+    """)
+
+    rows = cursor.fetchall()
+
+    return [
+        {"tool": row[0], "count": row[1]}
+        for row in rows
+    ]
+
+# for analytics - fetches logs for intent-breakdown
+@app.get("/analytics/intent-breakdown")
+def intent_breakdown():
+    cursor.execute("SELECT question FROM sessions")
+    rows = cursor.fetchall()
+
+    problem = 0
+    action = 0
+
+    for (q,) in rows:
+        if detect_intent(q.lower()) == "problem":
+            problem += 1
+        else:
+            action += 1
+
+    return {
+        "problem_queries": problem,
+        "action_queries": action
+    }

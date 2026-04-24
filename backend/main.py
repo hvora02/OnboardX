@@ -113,37 +113,36 @@ def clean_ai_output(text):
  
     return text
  
- 
-def get_next_steps(entry, history):
-    if not history:
-        return entry.get("steps", [])[:3]
- 
-    last_answer = history[-1]["a"].lower()
- 
-    for i, step in enumerate(entry.get("steps", [])):
-        if step.lower() in last_answer:
-            return entry.get("steps", [])[i+1:i+3]
- 
-    return entry.get("steps", [])[:3]
- 
+def is_followup(q):
+    vague_phrases = [
+        "more", "help more", "explain more", "tell me more",
+        "what next", "next", "after that", "and then",
+        "what should i do", "continue", "elaborate"
+    ]
+    return any(p in q for p in vague_phrases) or len(q.split()) <= 4
  
 def extract_relevant_data(entry, user_q, history):
     q = user_q.lower()
- 
     steps = entry.get("steps", [])
     rules = entry.get("rules", [])
- 
-    if "after" in q or "next" in q:
-        return get_next_steps(entry, history), rules[:2]
- 
-    filtered_steps = []
-    for step in steps:
-        if any(word in step.lower() for word in q.split()):
-            filtered_steps.append(step)
- 
-    if filtered_steps:
-        return filtered_steps[:3], rules[:2]
- 
+
+    # 🔥 follow-up: give next steps
+    if history and len(user_q.split()) <= 4:
+        last_answer = history[-1]["a"].lower()
+
+        for i, step in enumerate(steps):
+            if step.lower() in last_answer:
+                return steps[i+1:i+4], rules[:2]
+
+    # 🔥 keyword filtering
+    filtered = [
+        step for step in steps
+        if any(word in step.lower() for word in q.split())
+    ]
+
+    if filtered:
+        return filtered[:3], rules[:2]
+
     return steps[:3], rules[:2]
  
  
@@ -198,7 +197,7 @@ Answer:
  
  
 def build_fallback(tool_name, entry):
-    response = f"Here’s how to {entry['topic'].lower()} in {tool_name}:\n\n"
+    response = f"Here’s how to {entry.get('topic', 'this process').lower()} in {tool_name}:\n\n"
  
     for step in entry.get("steps", [])[:4]:
         response += f"• {step}\n"
@@ -244,6 +243,41 @@ def ask(data: dict):
         {"q": r[0], "a": r[1]}
         for r in reversed(rows)
     ]
+
+    last_tool = None
+    last_entry = None
+
+    if history:
+        cursor.execute("""
+            SELECT tool
+            FROM sessions
+            WHERE session_id = ?
+            ORDER BY created_at DESC
+            LIMIT 1
+        """, (session_id,))
+
+        row = cursor.fetchone()
+
+        if row:
+            last_tool = row[0]
+
+            for tool in tools:
+                if tool["tool"] == last_tool:
+                    if tool["entries"]:
+                        last_entry = tool["entries"][0]  # fallback safe entry
+                    break
+
+    if is_followup(q_lower) and last_entry:
+        answer = ai_rewrite(q, last_tool, last_entry, history)
+
+        cursor.execute("""
+            INSERT INTO sessions (session_id, user_id, question, answer, tool, created_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, (session_id, user_id, q, answer, last_tool, datetime.now()))
+
+        conn.commit()
+
+        return {"answer": answer}
  
     if q_lower in ["hi", "hello", "hey"]:
         return {"answer": "Hey! 👋 I'm OnboardX. How can I help you?"}
@@ -277,7 +311,7 @@ def ask(data: dict):
                 best_score = score
                 best_match = entry
                 best_tool = tool["tool"]
- 
+
     if best_match and best_score >= 5:
         answer = ai_rewrite(q, best_tool, best_match, history)
  

@@ -5,7 +5,6 @@ import requests
  
 app = FastAPI()
  
-# ------------------ CORS ------------------
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -14,83 +13,114 @@ app.add_middleware(
     allow_headers=["*"],
 )
  
-# ------------------ LOAD DATA ------------------
 with open("../data/tools.json", "r", encoding="utf-8") as f:
     tools = json.load(f)
  
-# ------------------ MEMORY ------------------
-sessions = {}  # session_id → history
+sessions = {}
  
-# ------------------ OLLAMA CONFIG ------------------
 OLLAMA_URL = "http://localhost:11434/api/generate"
-OLLAMA_MODEL = "phi"  # fast and already on your machine
- 
+OLLAMA_MODEL = "phi"
  
 @app.get("/")
 def home():
     return {"message": "OnboardX Backend Running 🚀"}
  
  
-# ------------------ INTENT DETECTION ------------------
 def detect_intent(q):
     problem_words = [
         "forgot", "miss", "issue", "error", "not working", "unable",
         "reject", "problem", "cant", "can't", "denied", "failed",
-        "conflict", "wrong", "fix", "broken", "not showing", "not visible"
+        "conflict", "wrong", "fix"
     ]
     return "problem" if any(word in q for word in problem_words) else "action"
  
  
-# ------------------ SCORING ------------------
 def calculate_score(query, keywords):
     score = 0
     for kw in keywords:
-        if kw in query:
-            score += 15
+        if kw == query:
+            score += 40
+        elif kw in query:
+            score += 20
         else:
             for word in kw.split():
                 if len(word) > 3 and word in query:
-                    score += 3
+                    score += 5
     return score
  
  
-# ------------------ EDGE CASE DETECTOR ------------------
-def is_out_of_scope(q):
-    out_of_scope_signals = [
-        "weather", "cricket", "ipl", "movie", "song", "joke",
-        "who is", "what is the capital", "stock price", "news",
-        "recipe", "food", "restaurant", "politics", "python tutorial",
-        "how to code", "explain ai", "what is machine learning",
-        "tell me about yourself", "who made you", "are you chatgpt"
+def clean_ai_output(text):
+    text = text.strip()
+ 
+    if text.startswith('"') and text.endswith('"'):
+        text = text[1:-1]
+ 
+    bad_phrases = [
+        "let's imagine", "for example", "suppose",
+        "consider", "scenario", "john", "mary", "employees"
     ]
-    return any(signal in q for signal in out_of_scope_signals)
+ 
+    for phrase in bad_phrases:
+        if phrase in text.lower():
+            return None
+ 
+    return text
  
  
-# ------------------ AI REWRITE (Ollama - Local) ------------------
-def ai_rewrite(user_q, tool_name, entry, history_text):
+def get_next_steps(entry, history):
+    if not history:
+        return entry.get("steps", [])[:3]
+ 
+    last_answer = history[-1]["a"].lower()
+ 
+    for i, step in enumerate(entry.get("steps", [])):
+        if step.lower() in last_answer:
+            return entry.get("steps", [])[i+1:i+3]
+ 
+    return entry.get("steps", [])[:3]
+ 
+ 
+def extract_relevant_data(entry, user_q, history):
+    q = user_q.lower()
+ 
+    steps = entry.get("steps", [])
+    rules = entry.get("rules", [])
+ 
+    if "after" in q or "next" in q:
+        return get_next_steps(entry, history), rules[:2]
+ 
+    filtered_steps = []
+    for step in steps:
+        if any(word in step.lower() for word in q.split()):
+            filtered_steps.append(step)
+ 
+    if filtered_steps:
+        return filtered_steps[:3], rules[:2]
+ 
+    return steps[:3], rules[:2]
+ 
+ 
+def ai_rewrite(user_q, tool_name, entry, history):
     try:
-        # Short and strict prompt — works well with phi
-        prompt = f"""You are OnboardX, a friendly onboarding assistant for new employees.
+        steps, rules = extract_relevant_data(entry, user_q, history)
  
-RULES:
-- Answer in 2-3 natural friendly sentences like a helpful colleague.
-- Do NOT use bullet points or numbered lists.
-- Only use the data provided below. Never add outside information.
-- If history is provided, use it to understand follow-up questions.
-- Be warm and simple — the user is new to the company.
+        prompt = f"""
+You are OnboardX, an internal company assistant.
  
-Company data:
-Steps: {entry.get('steps', [])}
-Rules: {entry.get('rules', [])}
-FAQs: {entry.get('faq', [])}
-Mistakes to avoid: {entry.get('mistakes', [])}
+STRICT RULES:
+- Answer ONLY the question
+- Use ONLY the data provided
+- Keep answer SHORT (2 sentences max)
+- DO NOT add examples or stories
+- DO NOT explain extra
+- DO NOT wrap answer in quotes
  
-Previous conversation:
-{history_text if history_text else "None"}
+Steps: {steps}
+Rules: {rules}
  
-Employee asked: {user_q}
- 
-Reply in 2-3 friendly sentences only. No bullet points:"""
+User: {user_q}
+Answer:
+"""
  
         response = requests.post(
             OLLAMA_URL,
@@ -99,42 +129,31 @@ Reply in 2-3 friendly sentences only. No bullet points:"""
                 "prompt": prompt,
                 "stream": False,
                 "options": {
-                    "temperature": 0.6,
-                    "num_predict": 150  # short = fast
+                    "temperature": 0.5,
+                    "num_predict": 120
                 }
             },
-            timeout=60
+            timeout=30
         )
  
         result = response.json()
-        answer = result["response"].strip()
+        raw = result["response"]
  
-        # Safety check — if phi returns something too short or empty, use fallback
-        if len(answer) < 20:
+        answer = clean_ai_output(raw)
+ 
+        if not answer or len(answer) < 15:
             return build_fallback(tool_name, entry)
  
         return answer
  
-    except requests.exceptions.ConnectionError:
-        print("❌ Ollama is not running! Start it with: ollama serve")
-        return "⚠️ Local AI is not running. Please start Ollama and try again."
- 
-    except Exception as e:
-        print(f"Ollama error: {e}")
+    except:
         return build_fallback(tool_name, entry)
  
  
-# ------------------ FALLBACK (if Ollama fails) ------------------
 def build_fallback(tool_name, entry):
-    topic = entry["topic"]
-    intent = entry.get("intent", "action")
+    response = f"Here’s how to {entry['topic'].lower()} in {tool_name}:\n\n"
  
-    if intent == "problem":
-        response = f"Here's how to fix '{topic}' in {tool_name}:\n\n"
-    else:
-        response = f"Here's how to '{topic}' in {tool_name}:\n\n"
- 
-    for step in entry.get("steps", []):
+    for step in entry.get("steps", [])[:4]:
         response += f"• {step}\n"
  
     if entry.get("rules"):
@@ -145,7 +164,14 @@ def build_fallback(tool_name, entry):
     return response
  
  
-# ------------------ MAIN API ------------------
+def is_out_of_scope(q):
+    signals = [
+        "weather", "cricket", "movie", "joke",
+        "who is", "python tutorial", "news"
+    ]
+    return any(s in q for s in signals)
+ 
+ 
 @app.post("/ask")
 def ask(data: dict):
     q = data.get("question", "").strip()
@@ -155,56 +181,29 @@ def ask(data: dict):
         return {"answer": "Please ask something! 😊"}
  
     q_lower = q.lower()
- 
-    # 🧠 Session memory
     history = sessions.get(session_id, [])
-    history_text = ""
-    for h in history[-4:]:
-        history_text += f"User: {h['q']}\nAssistant: {h['a']}\n"
  
-    # ------------------ SMALL TALK ------------------
-    greetings = ["hi", "hello", "hey", "hii", "helo", "sup", "good morning", "good afternoon"]
-    if any(q_lower == g or q_lower.startswith(g) for g in greetings):
-        return {"answer": "Hey! 👋 I'm OnboardX, your onboarding buddy. I can help you with Zoho People and GitHub Desktop. What do you need help with?"}
+    if q_lower in ["hi", "hello", "hey"]:
+        return {"answer": "Hey! 👋 I'm OnboardX. How can I help you?"}
  
-    if any(word in q_lower for word in ["thank", "thanks", "tysm", "ty", "thank you"]):
-        return {"answer": "Happy to help! 😊 Feel free to ask anytime."}
+    if "thank" in q_lower:
+        return {"answer": "Happy to help! 😊"}
  
-    if any(word in q_lower for word in ["bye", "goodbye", "see you", "cya", "ok bye"]):
-        return {"answer": "Goodbye! 👋 Good luck with your onboarding. Come back anytime!"}
+    if "bye" in q_lower:
+        return {"answer": "Goodbye! 👋"}
  
-    # ------------------ IDENTITY QUESTIONS ------------------
-    if any(phrase in q_lower for phrase in ["who are you", "what are you", "are you ai", "are you chatgpt", "who made you", "what can you do"]):
-        return {
-            "answer": "I'm OnboardX 👋 — a local AI assistant built for new employees at this company. I can help you with Zoho People (leaves, attendance, timesheets) and GitHub Desktop (repos, branches, PRs). I run fully on your company's machine — no data ever leaves! What do you need help with?"
-        }
- 
-    # ------------------ OUT OF SCOPE ------------------
     if is_out_of_scope(q_lower):
-        return {
-            "answer": "That's a bit outside what I know! 😅 I'm only trained on company tools and processes. I can help with things like applying for leave, fixing missed attendance, or cloning a repo. What can I help you with?"
-        }
+        return {"answer": "I can only help with company tools like Zoho People and GitHub Desktop."}
  
-    # ------------------ TOO VAGUE ------------------
     if len(q_lower.split()) < 2:
-        return {
-            "answer": "Could you give me a bit more context? Try something like — 'How do I apply for leave?' or 'I forgot to check in today' or 'How do I create a branch in GitHub?'"
-        }
+        return {"answer": "Could you be a bit more specific?"}
  
-    # ------------------ WHAT CAN YOU DO ------------------
-    if any(phrase in q_lower for phrase in ["what can you help", "what do you know", "help me with", "what topics"]):
-        return {
-            "answer": "I can help you with:\n\n🗓️ Zoho People — applying leave, half day, attendance, timesheets, payslips\n\n💻 GitHub Desktop — cloning repos, creating branches, pull requests, merge conflicts\n\nJust ask me anything related to these!"
-        }
- 
-    # ------------------ INTENT DETECTION ------------------
     intent = detect_intent(q_lower)
  
     best_match = None
     best_score = 0
     best_tool = None
  
-    # ------------------ MATCHING ------------------
     for tool in tools:
         for entry in tool["entries"]:
             score = calculate_score(q_lower, entry["keywords"])
@@ -217,22 +216,15 @@ def ask(data: dict):
                 best_match = entry
                 best_tool = tool["tool"]
  
-    # ------------------ MATCHED — send to Ollama ------------------
     if best_match and best_score >= 5:
-        answer = ai_rewrite(q, best_tool, best_match, history_text)
+        answer = ai_rewrite(q, best_tool, best_match, history)
  
         history.append({"q": q, "a": answer})
         sessions[session_id] = history[-6:]
  
         return {"answer": answer}
  
-    # ------------------ WEAK MATCH ------------------
-    if history and best_score > 0:
-        return {
-            "answer": "Hmm, I'm not quite sure what you mean. 🤔 Are you following up on what we were discussing, or is this something new? Try rephrasing — like 'How do I apply for leave?' or 'I forgot to check in'."
-        }
+    if history:
+        return {"answer": "Do you mean something related to your previous question?"}
  
-    # ------------------ NO MATCH ------------------
-    return {
-        "answer": "I don't have info on that in our company knowledge base. 🙁 I can help with leave, attendance, timesheets (Zoho People) or repos, branches, PRs (GitHub Desktop). Try asking something like 'How do I apply for sick leave?' or 'How do I create a pull request?'"
-    }
+    return {"answer": "I couldn’t find that in company data. Try asking about leave, attendance, or GitHub tasks."}

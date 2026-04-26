@@ -10,15 +10,26 @@ export default function AdminAnalytics() {
   const [intent, setIntent] = useState(null);
 
   useEffect(() => {
-    fetch("http://127.0.0.1:8000/analytics/top-questions")
-      .then(res => res.json())
-      .then(setTopQuestions);
+    // Get the user data stored during login in DashboardHome
+    const user = JSON.parse(localStorage.getItem("user"));
+    const headers = {
+      "Content-Type": "application/json",
+      "X-Role": user?.role // This allows the backend verify_role to work
+    };
 
-    fetch("http://127.0.0.1:8000/analytics/top-tools")
+    fetch("http://127.0.0.1:8000/analytics/top-questions", { headers })
+      .then(res => {
+        if (!res.ok) throw new Error("Unauthorized");
+        return res.json();
+      })
+      .then(setTopQuestions)
+      .catch(err => console.error(err));
+
+    fetch("http://127.0.0.1:8000/analytics/top-tools", { headers })
       .then(res => res.json())
       .then(setTopTools);
 
-    fetch("http://127.0.0.1:8000/analytics/intent-breakdown")
+    fetch("http://127.0.0.1:8000/analytics/intent-breakdown", { headers })
       .then(res => res.json())
       .then(setIntent);
   }, []);

@@ -10,18 +10,28 @@ export default function OnboardXWelcome() {
 
   const roles = ["User", "Manager", "Admin"];
 
+  const nameToId = {
+    "admin": 1,
+    "manager a": 2,
+    "manager b": 3,
+    "intern a": 4,
+    "intern b": 5,
+    "intern c": 6,
+    "intern d": 7,
+    "intern e": 8,
+  };
+
+  const validUsers = {
+    "intern a": "user",
+    "intern b": "user",
+    "intern c": "user",
+    "manager a": "manager",
+    "manager b": "manager",
+    "admin": "admin"
+  };
+
   const handleStart = () => {
     if (selectedRole && userName.trim()) {
-
-      const validUsers = {
-        "intern a": "user",
-        "intern b": "user",
-        "intern c": "user",
-        "manager a": "manager",
-        "manager b": "manager",
-        "admin": "admin"
-      };
-
       const normalizedName = userName.trim().toLowerCase();
       const normalizedRole = selectedRole.toLowerCase();
 
@@ -32,7 +42,8 @@ export default function OnboardXWelcome() {
 
       const userData = {
         name: normalizedName,
-        role: normalizedRole
+        role: normalizedRole,
+        id: nameToId[normalizedName],  // ✅ now saved
       };
 
       localStorage.setItem("user", JSON.stringify(userData));
@@ -56,14 +67,12 @@ export default function OnboardXWelcome() {
         {/* Logo + Title */}
         <div className="text-center">
           <div className="flex items-center justify-center gap-2">
-            
             <h1 className="text-xl font-bold text-indigo-600">
              🤖  OnboardX
             </h1>
           </div>
-
           <p className="text-sm text-gray-500 mt-1">
-            Your Team’s Onboarding Copilot
+            Your Team's Onboarding Copilot
           </p>
         </div>
 
@@ -73,7 +82,7 @@ export default function OnboardXWelcome() {
             Welcome Aboard! 👋
           </h2>
           <p className="text-sm text-gray-500 mt-2">
-            Let’s personalise your onboarding experience.
+            Let's personalise your onboarding experience.
           </p>
         </div>
 
@@ -132,7 +141,6 @@ export default function OnboardXWelcome() {
           )}
         </div>
 
-        {/* CTA Button (Gradient like your image) */}
         <button
           onClick={handleStart}
           disabled={!selectedRole || !userName.trim()}

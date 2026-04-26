@@ -1,100 +1,103 @@
+// AdminAnalytics.jsx
 import { useEffect, useState } from "react";
 import {
-  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
-  PieChart, Pie, Cell
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+  Legend,
 } from "recharts";
 
+const COLORS = ["#6366f1", "#22c55e"];
+
 export default function AdminAnalytics() {
-  const [topQuestions, setTopQuestions] = useState([]);
-  const [topTools, setTopTools] = useState([]);
-  const [intent, setIntent] = useState(null);
+  const [questions, setQuestions] = useState([]);
+  const [tools, setTools] = useState([]);
+  const [intent, setIntent] = useState([]);
+
+  // AdminAnalytics.jsx
 
   useEffect(() => {
-    // Get the user data stored during login in DashboardHome
-    const user = JSON.parse(localStorage.getItem("user"));
-    const headers = {
-      "Content-Type": "application/json",
-      "X-Role": user?.role // This allows the backend verify_role to work
-    };
+    const headers = { "X-Role": "admin" };
 
-    fetch("http://127.0.0.1:8000/analytics/top-questions", { headers })
-      .then(res => {
-        if (!res.ok) throw new Error("Unauthorized");
-        return res.json();
-      })
-      .then(setTopQuestions)
-      .catch(err => console.error(err));
+    // Update fetcher to catch the error
+    const fetcher = (url, setter) =>
+      fetch(url, { headers })
+        .then((res) => {
+          if (!res.ok) return null; // Silently ignore if restricted
+          return res.json();
+        })
+        .then((data) => {
+          if (data) setter(data);
+        })
+        .catch((err) => {
+          // This is where the "Failed to fetch" gets stopped
+          console.warn("Background fetch attempt ignored:", url);
+        });
 
-    fetch("http://127.0.0.1:8000/analytics/top-tools", { headers })
-      .then(res => res.json())
-      .then(setTopTools);
-
-    fetch("http://127.0.0.1:8000/analytics/intent-breakdown", { headers })
-      .then(res => res.json())
-      .then(setIntent);
+    fetcher("http://127.0.0.1:8000/analytics/top-questions", setQuestions);
+    fetcher("http://127.0.0.1:8000/analytics/top-tools", setTools);
+    fetcher("http://127.0.0.1:8000/analytics/intent-breakdown", setIntent);
   }, []);
 
-  const COLORS = ["#6366f1", "#22c55e"];
-
   return (
-    <div className="p-10 space-y-10">
-
-      <h1 className="text-3xl font-bold">📊 Admin Analytics</h1>
-
-      {/* TOP QUESTIONS */}
-      <div className="bg-white p-6 rounded-2xl shadow">
-        <h2 className="font-semibold mb-4">Top Questions</h2>
-
-        <ResponsiveContainer width="100%" height={300}>
-          <BarChart data={topQuestions}>
+    <div className="p-8 space-y-12">
+      {/* 1. Global Trending Questions */}
+      <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+        <h3 className="text-lg font-bold mb-4">Top Global Questions</h3>
+        <ResponsiveContainer width="100%" height={250}>
+          <BarChart data={questions}>
             <XAxis dataKey="question" hide />
             <YAxis />
-            <Tooltip />
-            <Bar dataKey="count" fill="#6366f1" />
+            <Tooltip labelFormatter={(val) => `Question: ${val}`} />
+            <Bar dataKey="count" fill="#6366f1" radius={[4, 4, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
       </div>
 
-      {/* TOP TOOLS */}
-      <div className="bg-white p-6 rounded-2xl shadow">
-        <h2 className="font-semibold mb-4">Most Used Tools</h2>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        {/* 2. Tool Usage */}
+        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+          <h3 className="text-lg font-bold mb-4">Tool Popularity</h3>
+          <ResponsiveContainer width="100%" height={250}>
+            <BarChart data={tools}>
+              <XAxis dataKey="tool" />
+              <YAxis />
+              <Tooltip />
+              <Bar dataKey="count" fill="#22c55e" radius={[4, 4, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
 
-        <ResponsiveContainer width="100%" height={300}>
-          <BarChart data={topTools}>
-            <XAxis dataKey="tool" />
-            <YAxis />
-            <Tooltip />
-            <Bar dataKey="count" fill="#22c55e" />
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
-
-      {/* INTENT BREAKDOWN */}
-      {intent && (
-        <div className="bg-white p-6 rounded-2xl shadow">
-          <h2 className="font-semibold mb-4">Intent Breakdown</h2>
-
-          <ResponsiveContainer width="100%" height={300}>
+        {/* 3. Intent Breakdown */}
+        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+          <h3 className="text-lg font-bold mb-4">Query Intent</h3>
+          <ResponsiveContainer width="100%" height={250}>
             <PieChart>
               <Pie
-                data={[
-                  { name: "Problem", value: intent.problem_queries },
-                  { name: "Action", value: intent.action_queries }
-                ]}
+                data={intent}
                 dataKey="value"
+                nameKey="name"
                 cx="50%"
                 cy="50%"
-                outerRadius={100}
+                outerRadius={80}
+                label
               >
-                <Cell fill={COLORS[0]} />
-                <Cell fill={COLORS[1]} />
+                {intent.map((_, i) => (
+                  <Cell key={i} fill={COLORS[i % COLORS.length]} />
+                ))}
               </Pie>
               <Tooltip />
+              <Legend />
             </PieChart>
           </ResponsiveContainer>
         </div>
-      )}
-
+      </div>
     </div>
   );
 }

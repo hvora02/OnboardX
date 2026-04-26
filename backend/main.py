@@ -215,11 +215,12 @@ def cluster_sessions(user_id: int = None) -> list[dict]:
     clusters: list[dict] = []
 
     for session in all_sessions:
-        sid = session["id"]
+        sid = session[0]          
+        q   = session[1]          
         if sid in seen:
             continue
 
-        q_vec = embed(session["question"])
+        q_vec = embed(q)
         try:
             neighbours = cursor.execute("""
                 SELECT s.id, s.question, v.distance
@@ -234,19 +235,19 @@ def cluster_sessions(user_id: int = None) -> list[dict]:
 
         members = []
         for n in neighbours:
-            if n["distance"] <= CLUSTER_DIST and n["id"] not in seen:
+            if n[2] <= CLUSTER_DIST and n[0] not in seen:  # n[2]=distance, n[0]=id
                 if user_id:
                     owner = cursor.execute(
-                        "SELECT user_id FROM sessions WHERE id = ?", (n["id"],)
+                        "SELECT user_id FROM sessions WHERE id = ?", (n[0],)
                     ).fetchone()
-                    if owner and owner["user_id"] != user_id:
+                    if owner and owner[0] != user_id:
                         continue
-                members.append(n["question"])
-                seen.add(n["id"])
+                members.append(n[1])   # n[1]=question
+                seen.add(n[0])
 
         if members:
             clusters.append({
-                "question": session["question"],
+                "question": q,
                 "count":    len(members),
                 "variants": members,
             })

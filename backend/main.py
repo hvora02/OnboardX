@@ -332,7 +332,7 @@ Assistant:"""
                 "stream":  False,
                 "options": {"temperature": 0.7, "num_predict": 180},
             },
-            timeout=45,
+            timeout=90,
         )
         raw = resp.json()["response"].strip()
         if raw.startswith('"') and raw.endswith('"'):

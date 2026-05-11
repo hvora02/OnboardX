@@ -3,6 +3,7 @@ import struct
 import requests
 import sqlite3
 import sqlite_vec
+from contextlib import contextmanager
 from datetime import datetime
 from fastapi import FastAPI, HTTPException, Header, Depends
 from fastapi.middleware.cors import CORSMiddleware
@@ -24,7 +25,7 @@ DIST_THRESHOLD = 1.0
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# DB — one factory, fresh connection per request (fixes recursive cursor error)
+# DB — fresh connection per request, always closed via context manager
 # ─────────────────────────────────────────────────────────────────────────────
 DB_PATH = "chat.db"
 
@@ -37,61 +38,67 @@ def get_db() -> sqlite3.Connection:
     c.enable_load_extension(False)
     return c
 
-# Startup connection used only for schema creation + seeding
-_startup_conn = get_db()
-_startup_cur  = _startup_conn.cursor()
+@contextmanager
+def db_conn():
+    """Context manager that guarantees the connection is closed even on error."""
+    db = get_db()
+    try:
+        yield db
+    finally:
+        db.close()
 
-_startup_cur.execute("""
-CREATE TABLE IF NOT EXISTS sessions (
-    id         INTEGER PRIMARY KEY AUTOINCREMENT,
-    session_id TEXT,
-    user_id    INTEGER,
-    question   TEXT,
-    answer     TEXT,
-    tool       TEXT,
-    created_at TIMESTAMP
-)""")
 
-_startup_cur.execute(f"""
-CREATE VIRTUAL TABLE IF NOT EXISTS session_vecs
-USING vec0(embedding FLOAT[{EMBEDDING_DIM}])
-""")
+# ─────────────────────────────────────────────────────────────────────────────
+# Schema + seed (runs once at startup)
+# ─────────────────────────────────────────────────────────────────────────────
+def _init_db():
+    with db_conn() as db:
+        db.executescript(f"""
+            CREATE TABLE IF NOT EXISTS sessions (
+                id         INTEGER PRIMARY KEY AUTOINCREMENT,
+                session_id TEXT,
+                user_id    INTEGER,
+                question   TEXT,
+                answer     TEXT,
+                tool       TEXT,
+                created_at TIMESTAMP
+            );
 
-_startup_cur.execute("""
-CREATE TABLE IF NOT EXISTS tool_kb (
-    id        INTEGER PRIMARY KEY AUTOINCREMENT,
-    tool_name TEXT,
-    topic     TEXT,
-    intent    TEXT,
-    full_json TEXT
-)""")
+            CREATE VIRTUAL TABLE IF NOT EXISTS session_vecs
+            USING vec0(embedding FLOAT[{EMBEDDING_DIM}]);
 
-_startup_cur.execute(f"""
-CREATE VIRTUAL TABLE IF NOT EXISTS tool_kb_vecs
-USING vec0(embedding FLOAT[{EMBEDDING_DIM}])
-""")
+            CREATE TABLE IF NOT EXISTS tool_kb (
+                id        INTEGER PRIMARY KEY AUTOINCREMENT,
+                tool_name TEXT,
+                topic     TEXT,
+                intent    TEXT,
+                full_json TEXT
+            );
 
-_startup_cur.execute("""
-CREATE TABLE IF NOT EXISTS users (
-    id   INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT,
-    role TEXT
-)""")
+            CREATE VIRTUAL TABLE IF NOT EXISTS tool_kb_vecs
+            USING vec0(embedding FLOAT[{EMBEDDING_DIM}]);
 
-_startup_cur.execute("SELECT COUNT(*) FROM users")
-if _startup_cur.fetchone()[0] == 0:
-    _startup_cur.executemany("INSERT INTO users (name, role) VALUES (?, ?)", [
-        ("Admin",     "admin"),
-        ("Manager A", "manager"),
-        ("Manager B", "manager"),
-        ("Intern A",  "employee"),
-        ("Intern B",  "employee"),
-        ("Intern C",  "employee"),
-        ("Intern D",  "employee"),
-        ("Intern E",  "employee"),
-    ])
+            CREATE TABLE IF NOT EXISTS users (
+                id   INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT,
+                role TEXT
+            );
+        """)
 
-_startup_conn.commit()
+        if db.execute("SELECT COUNT(*) FROM users").fetchone()[0] == 0:
+            db.executemany("INSERT INTO users (name, role) VALUES (?, ?)", [
+                ("Admin",     "admin"),
+                ("Manager A", "manager"),
+                ("Manager B", "manager"),
+                ("Intern A",  "employee"),
+                ("Intern B",  "employee"),
+                ("Intern C",  "employee"),
+                ("Intern D",  "employee"),
+                ("Intern E",  "employee"),
+            ])
+        db.commit()
+
+_init_db()
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -100,55 +107,61 @@ _startup_conn.commit()
 with open("../data/tools.json", "r", encoding="utf-8") as f:
     tools_data = json.load(f)
 
-def ingest_tools():
-    _startup_cur.execute("SELECT COUNT(*) FROM tool_kb")
-    if _startup_cur.fetchone()[0] > 0:
-        return
-
-    for tool in tools_data:
-        for entry in tool["entries"]:
-            entry_json = json.dumps(entry)
-            intent     = entry.get("intent", "action")
-
-            topic_hook = f"{entry['topic']} {tool['tool']}"
-            _insert_kb_row(tool["tool"], entry["topic"], intent, entry_json, topic_hook)
-
-            for kw in entry.get("keywords", []):
-                _insert_kb_row(tool["tool"], entry["topic"], intent, entry_json, kw)
-
-            for faq in entry.get("faq", []):
-                if faq.startswith("Q:"):
-                    q_part = faq.split("A:")[0].replace("Q:", "").strip()
-                    _insert_kb_row(tool["tool"], entry["topic"], intent, entry_json, q_part)
-
-    _startup_conn.commit()
-    count = _startup_cur.execute("SELECT COUNT(*) FROM tool_kb").fetchone()[0]
-    print(f"[OnboardX] Tool KB seeded — {count} rows ({len([e for t in tools_data for e in t['entries']])} entries).")
-
-def _insert_kb_row(tool_name, topic, intent, full_json, hook_text):
+def _insert_kb_row(db: sqlite3.Connection, tool_name, topic, intent, full_json, hook_text):
     v = embed(hook_text)
-    _startup_cur.execute(
+    db.execute(
         "INSERT INTO tool_kb (tool_name, topic, intent, full_json) VALUES (?, ?, ?, ?)",
         (tool_name, topic, intent, full_json)
     )
-    row_id = _startup_cur.lastrowid
-    _startup_cur.execute(
+    row_id = db.execute("SELECT last_insert_rowid()").fetchone()[0]
+    db.execute(
         "INSERT INTO tool_kb_vecs (rowid, embedding) VALUES (?, ?)",
         (row_id, serialize_vec(v))
     )
 
+def ingest_tools():
+    with db_conn() as db:
+        if db.execute("SELECT COUNT(*) FROM tool_kb").fetchone()[0] > 0:
+            return
+
+        for tool in tools_data:
+            for entry in tool["entries"]:
+                entry_json = json.dumps(entry)
+                intent     = entry.get("intent", "action")
+
+                _insert_kb_row(db, tool["tool"], entry["topic"], intent, entry_json,
+                               f"{entry['topic']} {tool['tool']}")
+
+                for kw in entry.get("keywords", []):
+                    _insert_kb_row(db, tool["tool"], entry["topic"], intent, entry_json, kw)
+
+                for faq in entry.get("faq", []):
+                    if faq.startswith("Q:"):
+                        q_part = faq.split("A:")[0].replace("Q:", "").strip()
+                        _insert_kb_row(db, tool["tool"], entry["topic"], intent, entry_json, q_part)
+
+        db.commit()
+        count = db.execute("SELECT COUNT(*) FROM tool_kb").fetchone()[0]
+        n_entries = sum(len(t["entries"]) for t in tools_data)
+        print(f"[OnboardX] Tool KB seeded — {count} rows ({n_entries} entries).")
+
 ingest_tools()
 
 
-def search_tools(q_vec: list[float], intent: str = None, k: int = 1, db: sqlite3.Connection = None) -> list[dict]:
-    rows = db.execute("""
-        SELECT kb.tool_name, kb.topic, kb.intent, kb.full_json, v.distance
-        FROM   tool_kb_vecs v
-        JOIN   tool_kb kb ON kb.id = v.rowid
-        WHERE  v.embedding MATCH ?
-        AND    k = 20
-        ORDER  BY v.distance
-    """, (serialize_vec(q_vec),)).fetchall()
+def search_tools(q_vec: list[float], intent: str = None, k: int = 1,
+                 db: sqlite3.Connection = None) -> list[dict]:
+    try:
+        rows = db.execute("""
+            SELECT kb.tool_name, kb.topic, kb.intent, kb.full_json, v.distance
+            FROM   tool_kb_vecs v
+            JOIN   tool_kb kb ON kb.id = v.rowid
+            WHERE  v.embedding MATCH ?
+            AND    k = 20
+            ORDER  BY v.distance
+        """, (serialize_vec(q_vec),)).fetchall()
+    except Exception as e:
+        print(f"[search_tools] query failed: {e}")
+        return []
 
     seen_topics: dict[str, dict] = {}
     for r in rows:
@@ -175,7 +188,8 @@ def search_tools(q_vec: list[float], intent: str = None, k: int = 1, db: sqlite3
 # ─────────────────────────────────────────────────────────────────────────────
 # Session helpers
 # ─────────────────────────────────────────────────────────────────────────────
-def insert_session(session_id, user_id, question, answer, tool, vec, db: sqlite3.Connection):
+def insert_session(session_id, user_id, question, answer, tool, vec,
+                   db: sqlite3.Connection):
     db.execute("""
         INSERT INTO sessions (session_id, user_id, question, answer, tool, created_at)
         VALUES (?, ?, ?, ?, ?, ?)
@@ -198,22 +212,25 @@ def knn_sessions(vec: list[float], k: int = 1, db: sqlite3.Connection = None):
             AND    k = ?
             ORDER  BY v.distance
         """, (serialize_vec(vec), k)).fetchall()
-    except Exception:
+    except Exception as e:
+        print(f"[knn_sessions] query failed: {e}")
         return []
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Analytics clustering
 # ─────────────────────────────────────────────────────────────────────────────
-CLUSTER_DIST = 0.71
+CLUSTER_DIST = 0.45
 
 def cluster_sessions(user_id: int = None, db: sqlite3.Connection = None) -> list[dict]:
     where  = "WHERE user_id = ?" if user_id else ""
     params = (user_id,)           if user_id else ()
 
+    # Fetch first, then filter out short questions
     all_sessions = db.execute(
         f"SELECT id, question FROM sessions {where} ORDER BY id", params
     ).fetchall()
+    all_sessions = [s for s in all_sessions if len(s["question"].strip()) > 10]
 
     if not all_sessions:
         return []
@@ -227,7 +244,13 @@ def cluster_sessions(user_id: int = None, db: sqlite3.Connection = None) -> list
         if sid in seen:
             continue
 
-        q_vec = embed(q)
+        # Guard embed() against bad unicode or model errors
+        try:
+            q_vec = embed(q)
+        except Exception as e:
+            print(f"[cluster_sessions] embed failed for session {sid}: {e}")
+            continue
+
         try:
             neighbours = db.execute("""
                 SELECT s.id, s.question, v.distance
@@ -237,16 +260,20 @@ def cluster_sessions(user_id: int = None, db: sqlite3.Connection = None) -> list
                 AND    k = 50
                 ORDER  BY v.distance
             """, (serialize_vec(q_vec),)).fetchall()
-        except Exception:
+        except Exception as e:
+            print(f"[cluster_sessions] neighbour query failed: {e}")
             neighbours = []
 
         members = []
         for n in neighbours:
             if n["distance"] <= CLUSTER_DIST and n["id"] not in seen:
                 if user_id:
-                    owner = db.execute(
-                        "SELECT user_id FROM sessions WHERE id = ?", (n["id"],)
-                    ).fetchone()
+                    try:
+                        owner = db.execute(
+                            "SELECT user_id FROM sessions WHERE id = ?", (n["id"],)
+                        ).fetchone()
+                    except Exception:
+                        owner = None
                     if owner and owner["user_id"] != user_id:
                         continue
                 members.append(n["question"])
@@ -301,8 +328,9 @@ def is_followup(q: str) -> bool:
 # ─────────────────────────────────────────────────────────────────────────────
 # LLM
 # ─────────────────────────────────────────────────────────────────────────────
-OLLAMA_URL   = "http://localhost:11434/api/generate"
-OLLAMA_MODEL = "mistral"
+OLLAMA_URL     = "http://localhost:11434/api/generate"
+OLLAMA_MODEL   = "mistral"
+OLLAMA_TIMEOUT = 20   # seconds — keeps demo responsive; fallback fires if Ollama hangs
 
 def ask_mistral(user_q: str, tool_name: str, entry: dict, history: list) -> str:
     history_text = ""
@@ -339,9 +367,11 @@ Assistant:"""
                 "stream":  False,
                 "options": {"temperature": 0.7, "num_predict": 80},
             },
-            timeout=120,
+            timeout=OLLAMA_TIMEOUT,
         )
+        resp.raise_for_status()
         raw = resp.json()["response"].strip()
+
         if raw.startswith('"') and raw.endswith('"'):
             raw = raw[1:-1]
 
@@ -363,6 +393,10 @@ Assistant:"""
         if raw[-1] not in ".!?":
             raw += "."
         return raw
+
+    except requests.exceptions.Timeout:
+        print("[fallback] Mistral timed out")
+        return build_fallback(tool_name, entry)
     except Exception as e:
         print(f"[fallback] Mistral error: {e}")
         return build_fallback(tool_name, entry)
@@ -446,17 +480,16 @@ def home():
 
 @app.get("/debug/search")
 def debug_search(q: str):
-    db   = get_db()
-    q_vec = embed(q)
-    rows  = db.execute("""
-        SELECT kb.tool_name, kb.topic, kb.intent, v.distance
-        FROM   tool_kb_vecs v
-        JOIN   tool_kb kb ON kb.id = v.rowid
-        WHERE  v.embedding MATCH ?
-        AND    k = 5
-        ORDER  BY v.distance
-    """, (serialize_vec(q_vec),)).fetchall()
-    db.close()
+    with db_conn() as db:
+        q_vec = embed(q)
+        rows  = db.execute("""
+            SELECT kb.tool_name, kb.topic, kb.intent, v.distance
+            FROM   tool_kb_vecs v
+            JOIN   tool_kb kb ON kb.id = v.rowid
+            WHERE  v.embedding MATCH ?
+            AND    k = 5
+            ORDER  BY v.distance
+        """, (serialize_vec(q_vec),)).fetchall()
     return [
         {"tool": r["tool_name"], "topic": r["topic"], "distance": round(r["distance"], 4)}
         for r in rows
@@ -468,71 +501,63 @@ def debug_search(q: str):
 # ─────────────────────────────────────────────────────────────────────────────
 @app.post("/ask")
 def ask(data: dict):
-    db         = get_db()
     user_id    = data.get("user_id", 4)
     q          = data.get("question", "").strip()
     session_id = data.get("session_id", "default")
 
     if not q:
-        db.close()
         return {"answer": "Please ask something! 😊"}
 
     q_lower = q.lower()
 
-    rows = db.execute("""
-        SELECT question, answer, tool FROM sessions
-        WHERE  session_id = ?
-        ORDER  BY created_at DESC
-        LIMIT  6
-    """, (session_id,)).fetchall()
-    history   = [{"q": r["question"], "a": r["answer"]} for r in reversed(rows)]
-    last_tool = rows[0]["tool"] if rows else None
-
-    last_entry = None
-    if last_tool:
-        for tool in tools_data:
-            if tool["tool"] == last_tool and tool["entries"]:
-                last_entry = tool["entries"][0]
-                break
-
-    if is_followup(q_lower) and last_entry:
-        answer = ask_mistral(q, last_tool, last_entry, history)
-        insert_session(session_id, user_id, q, answer, last_tool, embed(q), db)
-        db.close()
-        return {"answer": answer}
-
+    # Short-circuit greetings before touching the DB
     if q_lower in ["hi", "hello", "hey"]:
-        db.close()
         return {"answer": "Hey! 👋 I'm OnboardX. How can I help you today?"}
     if "thank" in q_lower:
-        db.close()
         return {"answer": "Happy to help! 😊"}
     if "bye" in q_lower:
-        db.close()
         return {"answer": "Goodbye! 👋"}
     if is_out_of_scope(q_lower):
-        db.close()
         return {"answer": "I can only help with company tools like Zoho People and GitHub Desktop."}
 
-    q_vec  = embed(q)
-    intent = detect_intent(q_lower)
+    with db_conn() as db:
+        rows = db.execute("""
+            SELECT question, answer, tool FROM sessions
+            WHERE  session_id = ?
+            ORDER  BY created_at DESC
+            LIMIT  6
+        """, (session_id,)).fetchall()
+        history   = [{"q": r["question"], "a": r["answer"]} for r in reversed(rows)]
+        last_tool = rows[0]["tool"] if rows else None
 
-    past = knn_sessions(q_vec, k=1, db=db)
-    if past and past[0]["distance"] < 0.20:
-        db.close()
-        return {"answer": past[0]["answer"]}
+        last_entry = None
+        if last_tool:
+            for tool in tools_data:
+                if tool["tool"] == last_tool and tool["entries"]:
+                    last_entry = tool["entries"][0]
+                    break
 
-    matches = search_tools(q_vec, intent=intent, k=1, db=db)
-    if matches:
-        best   = matches[0]
-        answer = ask_mistral(q, best["tool"], best["entry"], history)
-        insert_session(session_id, user_id, q, answer, best["tool"], q_vec, db)
-        history.append({"q": q, "a": answer})
-        session_cache[session_id] = history[-6:]
-        db.close()
-        return {"answer": answer}
+        if is_followup(q_lower) and last_entry:
+            answer = ask_mistral(q, last_tool, last_entry, history)
+            insert_session(session_id, user_id, q, answer, last_tool, embed(q), db)
+            return {"answer": answer}
 
-    db.close()
+        q_vec  = embed(q)
+        intent = detect_intent(q_lower)
+
+        past = knn_sessions(q_vec, k=1, db=db)
+        if past and past[0]["distance"] < 0.20:
+            return {"answer": past[0]["answer"]}
+
+        matches = search_tools(q_vec, intent=intent, k=1, db=db)
+        if matches:
+            best   = matches[0]
+            answer = ask_mistral(q, best["tool"], best["entry"], history)
+            insert_session(session_id, user_id, q, answer, best["tool"], q_vec, db)
+            history.append({"q": q, "a": answer})
+            session_cache[session_id] = history[-6:]
+            return {"answer": answer}
+
     if history:
         return {"answer": "I'm not sure — could you rephrase? You can ask me about leave, attendance, timesheets, or GitHub."}
     return {"answer": "I couldn't find that. Try asking about leave, attendance, timesheets, or GitHub."}
@@ -543,27 +568,23 @@ def ask(data: dict):
 # ─────────────────────────────────────────────────────────────────────────────
 @app.get("/analytics/top-questions", dependencies=[Depends(verify_role("admin"))])
 def top_questions():
-    db     = get_db()
-    result = cluster_sessions(db=db)[:5]
-    db.close()
-    return result
+    with db_conn() as db:
+        return cluster_sessions(db=db)[:5]
 
 @app.get("/analytics/top-tools", dependencies=[Depends(verify_role("admin"))])
 def top_tools():
-    db   = get_db()
-    rows = db.execute("""
-        SELECT tool, COUNT(*) as count FROM sessions
-        WHERE tool IS NOT NULL
-        GROUP BY tool ORDER BY count DESC
-    """).fetchall()
-    db.close()
+    with db_conn() as db:
+        rows = db.execute("""
+            SELECT tool, COUNT(*) as count FROM sessions
+            WHERE tool IS NOT NULL
+            GROUP BY tool ORDER BY count DESC
+        """).fetchall()
     return [{"tool": r["tool"], "count": r["count"]} for r in rows]
 
 @app.get("/analytics/intent-breakdown", dependencies=[Depends(verify_role("admin"))])
 def intent_breakdown():
-    db      = get_db()
-    rows    = db.execute("SELECT question FROM sessions").fetchall()
-    db.close()
+    with db_conn() as db:
+        rows = db.execute("SELECT question FROM sessions").fetchall()
     problem = sum(1 for r in rows if detect_intent(r["question"].lower()) == "problem")
     return [
         {"name": "Problem", "value": problem},
@@ -572,29 +593,27 @@ def intent_breakdown():
 
 @app.get("/analytics/manager", dependencies=[Depends(verify_role("manager"))])
 def manager_view():
-    db        = get_db()
-    employees = db.execute("""
-        SELECT DISTINCT u.id, u.name FROM users u
-        JOIN sessions s ON s.user_id = u.id
-        WHERE u.role = 'employee'
-    """).fetchall()
+    with db_conn() as db:
+        employees = db.execute("""
+            SELECT DISTINCT u.id, u.name FROM users u
+            JOIN sessions s ON s.user_id = u.id
+            WHERE u.role = 'employee'
+        """).fetchall()
 
-    result = []
-    for emp in employees:
-        for c in cluster_sessions(user_id=emp["id"], db=db)[:3]:
-            result.append({
-                "employee": emp["name"],
-                "question": c["question"],
-                "count":    c["count"],
-                "variants": c["variants"],
-            })
+        result = []
+        for emp in employees:
+            for c in cluster_sessions(user_id=emp["id"], db=db)[:3]:
+                result.append({
+                    "employee": emp["name"],
+                    "question": c["question"],
+                    "count":    c["count"],
+                    "variants": c["variants"],
+                })
+
     result.sort(key=lambda x: x["count"], reverse=True)
-    db.close()
     return result[:10]
 
 @app.get("/analytics/user/{user_id}", dependencies=[Depends(verify_role("employee"))])
 def user_analytics(user_id: int):
-    db     = get_db()
-    result = cluster_sessions(user_id=user_id, db=db)[:5]
-    db.close()
-    return result
+    with db_conn() as db:
+        return cluster_sessions(user_id=user_id, db=db)[:5]

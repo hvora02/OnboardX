@@ -8,6 +8,15 @@ from datetime import datetime
 from fastapi import FastAPI, HTTPException, Header, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from sentence_transformers import SentenceTransformer
+import os
+from dotenv import load_dotenv
+import google.generativeai as genai
+
+load_dotenv()
+
+genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
+
+gemini_model = genai.GenerativeModel("gemini-2.5-flash")
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Embeddings
@@ -328,79 +337,53 @@ def is_followup(q: str) -> bool:
 # ─────────────────────────────────────────────────────────────────────────────
 # LLM
 # ─────────────────────────────────────────────────────────────────────────────
-OLLAMA_URL     = "http://localhost:11434/api/generate"
-OLLAMA_MODEL   = "mistral"
-OLLAMA_TIMEOUT = 20   # seconds — keeps demo responsive; fallback fires if Ollama hangs
-
-def ask_mistral(user_q: str, tool_name: str, entry: dict, history: list) -> str:
+def ask_gemini(user_q: str, tool_name: str, entry: dict, history: list) -> str:
     history_text = ""
+
     if history:
         history_text = "Recent conversation:\n" + "\n".join(
-            f"User: {h['q']}\nAssistant: {h['a']}" for h in history[-3:]
+            f"User: {h['q']}\nAssistant: {h['a']}"
+            for h in history[-3:]
         ) + "\n\n"
 
-    faq_text      = "\n".join(entry.get("faq", []))
+    faq_text = "\n".join(entry.get("faq", []))
     mistakes_text = ", ".join(entry.get("mistakes", []))
 
-    prompt = f"""{history_text}You are OnboardX, a friendly internal company assistant helping new employees.
+    prompt = f"""
+        {history_text}
+        You are OnboardX, a friendly internal company assistant helping new employees.
 
-Answer in plain conversational prose — no bullet points, no numbered lists, no bold text.
-Be concise (2-3 sentences). Only mention what directly answers the question.
-For problems/errors, focus on the fix first.
+        Answer in plain conversational prose.
+        No bullet points.
+        No numbered lists.
+        Keep answers concise (2-3 sentences).
+        For problems/errors, focus on the fix first.
 
-Tool: {tool_name}
-Process: {entry.get('topic')}
-Steps: {entry.get('steps', [])}
-Rules: {entry.get('rules', [])}
-Common mistakes: {mistakes_text}
-FAQs: {faq_text}
+        Tool: {tool_name}
+        Process: {entry.get('topic')}
+        Steps: {entry.get('steps', [])}
+        Rules: {entry.get('rules', [])}
+        Common mistakes: {mistakes_text}
+        FAQs: {faq_text}
 
-User: {user_q}
-Assistant:"""
+        User: {user_q}
+        Assistant:
+        """
 
     try:
-        resp = requests.post(
-            OLLAMA_URL,
-            json={
-                "model":   OLLAMA_MODEL,
-                "prompt":  prompt,
-                "stream":  False,
-                "options": {"temperature": 0.7, "num_predict": 80},
-            },
-            timeout=OLLAMA_TIMEOUT,
-        )
-        resp.raise_for_status()
-        raw = resp.json()["response"].strip()
+        response = gemini_model.generate_content(prompt)
 
-        if raw.startswith('"') and raw.endswith('"'):
-            raw = raw[1:-1]
+        raw = response.text.strip()
 
-        lines = raw.splitlines()
-        cleaned = []
-        for line in lines:
-            line = line.strip()
-            if not line:
-                continue
-            line = line.lstrip("•-*0123456789. ")
-            if line:
-                cleaned.append(line)
-        raw = " ".join(cleaned)
-
-        if not raw or len(raw) < 15:
-            print(f"[fallback] Mistral too short: '{raw}'")
+        if not raw or len(raw) < 10:
             return build_fallback(tool_name, entry)
 
-        if raw[-1] not in ".!?":
-            raw += "."
         return raw
 
-    except requests.exceptions.Timeout:
-        print("[fallback] Mistral timed out")
-        return build_fallback(tool_name, entry)
     except Exception as e:
-        print(f"[fallback] Mistral error: {e}")
+        print(f"[Gemini Error] {e}")
         return build_fallback(tool_name, entry)
-
+    
 
 def build_fallback(tool_name: str, entry: dict) -> str:
     print(f"[fallback] serving: {entry.get('topic')} / {tool_name}")
@@ -538,7 +521,7 @@ def ask(data: dict):
                     break
 
         if is_followup(q_lower) and last_entry:
-            answer = ask_mistral(q, last_tool, last_entry, history)
+            answer = ask_gemini(q, last_tool, last_entry, history)
             insert_session(session_id, user_id, q, answer, last_tool, embed(q), db)
             return {"answer": answer}
 
@@ -552,7 +535,7 @@ def ask(data: dict):
         matches = search_tools(q_vec, intent=intent, k=1, db=db)
         if matches:
             best   = matches[0]
-            answer = ask_mistral(q, best["tool"], best["entry"], history)
+            answer = ask_gemini(q, best["tool"], best["entry"], history)
             insert_session(session_id, user_id, q, answer, best["tool"], q_vec, db)
             history.append({"q": q, "a": answer})
             session_cache[session_id] = history[-6:]

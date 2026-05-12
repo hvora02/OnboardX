@@ -1,3 +1,66 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+:root {
+  /* BRAND */
+  --color-brand-primary: #534AB7;
+  --color-brand-primary-hover: #463DA3;
+  --color-brand-primary-soft: #EEEDFE;
+
+  --color-brand-secondary: #7F77DD;
+  --color-brand-tertiary: #AFA9EC;
+
+  /* BACKGROUNDS */
+  --color-background-primary: #FFFFFF;
+  --color-background-secondary: #F7F7FB;
+  --color-background-tertiary: #F1F2F8;
+  --color-background-elevated: #FCFCFE;
+
+  /* TEXT */
+  --color-text-primary: #1E1B3A;
+  --color-text-secondary: #6F6B8A;
+  --color-text-tertiary: #9A97B4;
+  --color-text-inverse: #FFFFFF;
+
+  /* BORDERS */
+  --color-border-primary: #D7D5EA;
+  --color-border-secondary: #E6E4F2;
+  --color-border-tertiary: #EFEFFC;
+
+  /* STATUS */
+  --color-success: #5DCAA5;
+  --color-success-soft: #E8F8F2;
+
+  --color-warning: #F4B740;
+  --color-warning-soft: #FFF5DF;
+
+  --color-danger: #E45C5C;
+  --color-danger-soft: #FDECEC;
+
+  /* CHARTS */
+  --color-chart-1: #534AB7;
+  --color-chart-2: #7F77DD;
+  --color-chart-3: #AFA9EC;
+  --color-chart-4: #9FE1CB;
+  --color-chart-5: #5DCAA5;
+
+  /* SURFACES */
+  --color-surface-hover: rgba(83, 74, 183, 0.04);
+  --color-surface-active: rgba(83, 74, 183, 0.08);
+
+  /* RADII */
+  --border-radius-sm: 8px;
+  --border-radius-md: 12px;
+  --border-radius-lg: 18px;
+  --border-radius-xl: 24px;
+
+  /* SHADOWS */
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.04);
+  --shadow-md: 0 4px 12px rgba(83, 74, 183, 0.08);
+  --shadow-lg: 0 12px 28px rgba(83, 74, 183, 0.12);
+
+  /* TRANSITIONS */
+  --transition-fast: 120ms ease;
+  --transition-normal: 180ms ease;
+}
